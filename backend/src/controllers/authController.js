@@ -1,358 +1,128 @@
-const bcrypt = require("bcryptjs");
-const User = require("../models/User");
-const generateToken = require("../utils/generateToken");
-const Otp = require("../models/Otp");
-const EmailOtp = require("../models/EmailOtp");
-const generateOtp = require("../utils/generateOtp");
-const sendEmail = require("../utils/sendEmail");
-const otpTemplate = require("../mailTemplates/otpVerify")
+const authService = require("../services/auth.service");
 
 // SEND EMAIL OTP (Signup)
-exports.sendEmailOtp = async (req, res) => {
+exports.sendEmailOtp = async (req, res, next) => {
   try {
-    const { email } = req.body;
-
-    if (!email) {
-      return res.status(400).json({ message: "Email is required" });
-    }
-
-    // prevent duplicate accounts
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already registered" });
-    }
-
-    await EmailOtp.deleteMany({ email });
-
-    const otp = generateOtp();
-    const hashedOtp = await bcrypt.hash(otp, 10);
-
-    await EmailOtp.create({
-      email,
-      otp: hashedOtp,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-    });
-
-
-    const htmlContent = otpTemplate(otp);
-
-    await sendEmail(
-      email,
-      "Your Registration OTP",
-      htmlContent
-    );
-
+    await authService.sendEmailOtp(req.body.email);
 
     res.status(200).json({
       success: true,
       message: "OTP sent to email",
     });
-
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
 
-// VERIFY EMAIL OTP 
-exports.verifyEmailOtp = async (req, res) => {
+// VERIFY EMAIL OTP
+exports.verifyEmailOtp = async (req, res, next) => {
   try {
-    const { email, otp } = req.body;
+    await authService.verifyEmailOtp(
+      req.body.email,
+      req.body.otp
+    );
 
-    // Find OTP record
-    const otpRecord = await EmailOtp.findOne({ email });
-
-    if (!otpRecord) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired OTP",
-      });
-    }
-
-    // Check expiry first
-    if (otpRecord.expiresAt < new Date()) {
-      await EmailOtp.deleteMany({ email });
-
-      return res.status(400).json({
-        success: false,
-        message: "OTP expired. Please request a new one.",
-      });
-    }
-
-    // Compare hashed OTP
-    const isMatch = await bcrypt.compare(otp, otpRecord.otp);
-
-    if (!isMatch) {
-      otpRecord.attempts += 1;
-
-      // If too many attempts → invalidate OTP
-      if (otpRecord.attempts >= 5) {
-        await EmailOtp.deleteMany({ email });
-
-        return res.status(400).json({
-          success: false,
-          message: "Too many incorrect attempts. Please request a new OTP.",
-        });
-      }
-
-      await otpRecord.save();
-
-      return res.status(400).json({
-        success: false,
-        message: "Invalid OTP",
-      });
-    }
-
-    // If correct → delete OTP
-    await EmailOtp.deleteMany({ email });
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       message: "Email verified successfully",
     });
-
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    next(error);
   }
 };
 
 
-
-// COMPLETE REGISTRATION (Signup)
-
-exports.completeRegistration = async (req, res) => {
+// COMPLETE REGISTRATION
+exports.completeRegistration = async (req, res, next) => {
   try {
-    const { name, email, password, mobile } = req.body;
-
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: "Required fields missing" });
-    }
-
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User already exists" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await User.create({
-      name,
-      email,
-      mobile, 
-      password: hashedPassword,
-    });
-
-    const token = generateToken(user._id);
+    const result = await authService.completeRegistration(req.body);
 
     res.status(201).json({
       success: true,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      ...result,
     });
-
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-
-
 // SEND MOBILE OTP (Login)
-
-exports.sendOtp = async (req, res) => {
+exports.sendOtp = async (req, res, next) => {
   try {
-    const { mobile } = req.body;
-
-    if (!mobile) {
-      return res.status(400).json({ message: "Mobile number required" });
-    }
-
-    const user = await User.findOne({ mobile });
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        message: "User not registered. Please sign up with email.",
-      });
-    }
-
-    await Otp.deleteMany({ mobile });
-
-    const otp = generateOtp();
-    const hashedOtp = await bcrypt.hash(otp, 10);
-
-    await Otp.create({
-      mobile,
-      otp: hashedOtp,
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-    });
-
-
-    // sms provider
-    console.log("Mobile OTP:", otp);
+    await authService.sendMobileOtp(req.body.mobile);
 
     res.status(200).json({
       success: true,
       message: "OTP sent successfully",
     });
-
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
   }
 };
 
-
-//  VERIFY MOBILE OTP 
-exports.verifyOtp = async (req, res) => {
+// VERIFY MOBILE OTP (Login)
+exports.verifyOtp = async (req, res, next) => {
   try {
-    const { mobile, otp } = req.body;
+    const result = await authService.verifyMobileOtp(
+      req.body.mobile,
+      req.body.otp
+    );
 
-    if (!mobile || !otp) {
-      return res.status(400).json({
-        success: false,
-        message: "Mobile and OTP are required",
-      });
-    }
-
-    // Find OTP record
-    const otpRecord = await Otp.findOne({ mobile });
-
-    if (!otpRecord) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid or expired OTP",
-      });
-    }
-
-    // Check expiry first
-    if (otpRecord.expiresAt < new Date()) {
-      await Otp.deleteMany({ mobile });
-
-      return res.status(400).json({
-        success: false,
-        message: "OTP expired. Please request a new one.",
-      });
-    }
-
-    // Compare hashed OTP
-    const isMatch = await bcrypt.compare(otp, otpRecord.otp);
-
-    if (!isMatch) {
-      otpRecord.attempts += 1;
-
-      // If too many wrong attempts → invalidate OTP
-      if (otpRecord.attempts >= 5) {
-        await Otp.deleteMany({ mobile });
-
-        return res.status(400).json({
-          success: false,
-          message: "Too many incorrect attempts. Please request a new OTP.",
-        });
-      }
-
-      await otpRecord.save();
-
-      return res.status(400).json({
-        success: false,
-        message: "Invalid OTP",
-      });
-    }
-
-    // OTP correct → find user
-    const user = await User.findOne({ mobile });
-
-    if (!user) {
-      await Otp.deleteMany({ mobile });
-
-      return res.status(400).json({
-        success: false,
-        message: "User not registered. Please sign up with email.",
-      });
-    }
-
-    // Delete OTP after successful login
-    await Otp.deleteMany({ mobile });
-
-    const token = generateToken(user._id);
-
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      ...result,
     });
-
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    next(error);
   }
 };
 
 
 // EMAIL LOGIN
-exports.login = async (req, res) => {
+exports.login = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-
-    const user = await User.findOne({ email }).select("+password");
-
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const token = generateToken(user._id);
+    const result = await authService.loginWithEmail(
+      req.body.email,
+      req.body.password
+    );
 
     res.status(200).json({
       success: true,
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
+      ...result,
     });
-
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    next(error);
+  }
+};
+
+// GET CURRENT USER
+exports.getMe = async (req, res, next) => {
+  try {
+    const user = await authService.getCurrentUser(req.user.id);
+
+    res.status(200).json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    next(error);
   }
 };
 
 
-// GET CURRENT USER
-exports.getMe = async (req, res) => {
-  res.status(200).json({
-    success: true,
-    user: req.user,
-  });
+// LOGOUT (Stateless)
+exports.logout = async (req, res, next) => {
+  try {
+    await authService.logout();
+
+    res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
-
-
-// LOGOUT
-exports.logout = async (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Logged out successfully",
-  });
-};
 

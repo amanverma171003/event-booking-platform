@@ -1,6 +1,6 @@
 const express = require("express");
 const authRoutes = require("./routes/authRoutes");
-
+const { errorHandler } = require("./middleware/error.middleware");
 const cors = require("cors");
 
 const app = express();
@@ -17,5 +17,7 @@ app.get("/", (req, res) => {
     message: "API running",
   });
 });
+
+app.use(errorHandler);
 
 module.exports = app;

@@ -13,18 +13,17 @@ const {
 } = require("../controllers/authController");
 
 const { protect } = require("../middleware/authMiddleware");
-const { validate } = require("../middleware/validationMiddleware");
+const { validate } = require("../middleware/validate.middleware");
 const { otpLimiter, loginLimiter } = require("../middleware/rateLimiter");
 
 const {
-  sendEmailOtpValidator,
-  verifyEmailOtpValidator,
-  completeRegistrationValidator,
-  loginValidator,
-  sendOtpValidator,
-  verifyOtpValidator,
-} = require("../validators/authValidator");
-
+  sendEmailOtpSchema,
+  verifyEmailOtpSchema,
+  completeRegistrationSchema,
+  loginSchema,
+  sendMobileOtpSchema,
+  verifyMobileOtpSchema,
+} = require("../validations/auth.validation");
 
 
 // EMAIL REGISTRATION FLOW
@@ -33,25 +32,21 @@ const {
 router.post(
   "/send-email-otp",
   otpLimiter,
-  sendEmailOtpValidator,
-  validate,
+  validate(sendEmailOtpSchema),
   sendEmailOtp
 );
-
 
 // Verify Email OTP
 router.post(
   "/verify-email-otp",
-  verifyEmailOtpValidator,
-  validate,
+  validate(verifyEmailOtpSchema),
   verifyEmailOtp
 );
 
 // Complete Registration
 router.post(
   "/complete-registration",
-  completeRegistrationValidator,
-  validate,
+  validate(completeRegistrationSchema),
   completeRegistration
 );
 
@@ -62,35 +57,29 @@ router.post(
 router.post(
   "/login",
   loginLimiter,
-  loginValidator,
-  validate,
+  validate(loginSchema),
   login
 );
 
-
-// Mobile OTP Login 
+// Send Mobile OTP
 router.post(
   "/send-otp",
   otpLimiter,
-  sendOtpValidator,
-  validate,
+  validate(sendMobileOtpSchema),
   sendOtp
 );
 
-
-// Mobile OTP Login 
+// Verify Mobile OTP
 router.post(
   "/verify-otp",
-  verifyOtpValidator,
-  validate,
+  validate(verifyMobileOtpSchema),
   verifyOtp
 );
 
-
 // USER SESSION
 router.get("/me", protect, getMe);
-router.post("/logout", logout);
-
+router.post("/logout", protect, logout);
 
 module.exports = router;
+
 
