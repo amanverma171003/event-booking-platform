@@ -9,7 +9,7 @@ exports.validate = (schema) => (req, res, next) => {
       errors: error.details.map((err) => err.message),
     });
   }
-
+  console.log("validation middleware hit");
   req.body = value;
   next();
 };

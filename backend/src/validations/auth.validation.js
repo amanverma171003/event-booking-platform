@@ -2,8 +2,14 @@ const Joi = require("joi");
 
 // SEND EMAIL OTP
 exports.sendEmailOtpSchema = Joi.object({
-  email: Joi.string().email().required(),
+  email: Joi.string()
+    .pattern(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[A-Za-z]{2,}$/)
+    .required()
+    .messages({
+      "string.pattern.base": "Invalid email format",
+    }),
 });
+
 
 // VERIFY EMAIL OTP
 exports.verifyEmailOtpSchema = Joi.object({

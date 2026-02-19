@@ -1,41 +1,51 @@
-const mongoose = require("mongoose");
-
 const bookingSchema = new mongoose.Schema(
   {
-    user: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true,
-    },
     venue: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Venue",
       required: true,
+      index: true,
     },
-    event_type: {
-      type: String,
+
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true,
+      index: true,
     },
-    event_date: {
+
+    startTime: {
       type: Date,
       required: true,
       index: true,
     },
-    guest_count: {
+
+    endTime: {
+      type: Date,
+      required: true,
+      index: true,
+    },
+
+    totalPrice: {
       type: Number,
       required: true,
     },
-    total_price: {
-      type: Number,
-      required: true,
-    },
+
     status: {
       type: String,
-      enum: ["pending", "confirmed", "cancelled"],
+      enum: ["pending", "confirmed", "cancelled", "failed"],
       default: "pending",
+      index: true,
     },
+
+    paymentId: {
+      type: String,
+    },
+
   },
   { timestamps: true }
 );
+
+bookingSchema.index({ venue: 1, startTime: 1, endTime: 1 });
 
 module.exports = mongoose.model("Booking", bookingSchema);
