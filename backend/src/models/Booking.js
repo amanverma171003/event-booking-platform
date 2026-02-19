@@ -1,3 +1,5 @@
+const mongoose = require("mongoose");
+
 const bookingSchema = new mongoose.Schema(
   {
     venue: {
@@ -40,6 +42,17 @@ const bookingSchema = new mongoose.Schema(
 
     paymentId: {
       type: String,
+    },
+
+    razorpayOrderId: {
+      type: String,
+      index: true
+    },
+
+    expiresAt: {
+      type: Date,
+      required: true,
+      index: true,
     },
 
   },

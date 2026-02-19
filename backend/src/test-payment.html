@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+  <button id="payBtn">Pay Now</button>
+
+  <script>
+    document.getElementById("payBtn").onclick = async function () {
+
+      // STEP 1: Call your backend create-order API
+      const response = await fetch("http://localhost:5000/api/payments/create-order", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer token"
+        },
+        body: JSON.stringify({
+          bookingId: "booking id"
+        })
+      });
+
+      const data = await response.json();
+
+      const options = {
+        key: "test razorpay key",
+        amount: data.data.amount,
+        currency: data.data.currency,
+        order_id: data.data.orderId,
+
+        handler: async function (response) {
+
+          // STEP 2: Call verify API
+          await fetch("http://localhost:5000/api/payments/verify", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer token"
+            },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              bookingId: "booking id"
+            })
+          });
+
+          alert("Payment verified");
+        }
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.open();
+    }
+  </script>
+</body>
+</html>

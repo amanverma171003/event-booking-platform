@@ -1,6 +1,8 @@
 const express = require("express");
 const authRoutes = require("./routes/authRoutes");
 const venueRoutes = require("./routes/venue.routes");
+const bookingRoutes = require("./routes/booking.routes");
+const paymentRoutes = require("./routes/payment.routes");
 const { errorHandler } = require("./middleware/error.middleware");
 const cors = require("cors");
 
@@ -14,6 +16,12 @@ app.use("/api/auth", authRoutes);
 
 // venue routes
 app.use("/api/venues", venueRoutes);
+
+// booking routes
+app.use("/api/bookings", bookingRoutes);
+
+// payment routes
+app.use("/api/payments", paymentRoutes);
 
 // landing page route
 app.get("/", (req, res) => {
