@@ -14,7 +14,7 @@
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": "Bearer token"
+          "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OTVjMWI4Y2JhYjMyNjQzY2JhMjlmZCIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzcxNTc2MjI3LCJleHAiOjE3NzIxODEwMjd9.pWO16TGJB4e5Q9riN3IRhLalzL3vmKqEJk_bHg4tHuM"
         },
         body: JSON.stringify({
           bookingId: "booking id"
@@ -24,7 +24,7 @@
       const data = await response.json();
 
       const options = {
-        key: "test razorpay key",
+        key: "razorpay key",
         amount: data.data.amount,
         currency: data.data.currency,
         order_id: data.data.orderId,
@@ -36,7 +36,7 @@
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "Authorization": "Bearer token"
+              "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjY5OTVjMWI4Y2JhYjMyNjQzY2JhMjlmZCIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzcxNTc2MjI3LCJleHAiOjE3NzIxODEwMjd9.pWO16TGJB4e5Q9riN3IRhLalzL3vmKqEJk_bHg4tHuM"
             },
             body: JSON.stringify({
               razorpay_order_id: response.razorpay_order_id,

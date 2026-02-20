@@ -1,4 +1,5 @@
 const venueService = require("../services/venue.service");
+const availabilityService = require("../services/availablity.service");
 
 exports.createVenue = async (req, res, next) => {
   try {
@@ -80,4 +81,21 @@ exports.deleteVenue = async (req, res, next) => {
   }
 };
 
+exports.getAvailability = async (req, res, next) => {
+  try {
+
+    const data = await availabilityService.getAvailability(
+      req.params.venueId,
+      req.query.date
+    );
+
+    res.status(200).json({
+      success: true,
+      data
+    });
+
+  } catch (error) {
+    next(error);
+  }
+};
 

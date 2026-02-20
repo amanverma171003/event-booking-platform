@@ -24,14 +24,14 @@ exports.createPaymentOrder = async (bookingId, userId) => {
     throw err;
   }
 
-  if (booking.status !== "pending") {
+  if (booking.bookingState !== "PENDING_PAYMENT") {
     const err = new Error("Booking not eligible for payment");
     err.statusCode = 400;
     throw err;
   }
 
   if (booking.expiresAt < new Date()) {
-    booking.status = "failed";
+    booking.bookingState = "EXPIRED";
     await booking.save();
 
     const err = new Error("Booking expired");
@@ -40,7 +40,7 @@ exports.createPaymentOrder = async (bookingId, userId) => {
   }
 
   const options = {
-    amount: booking.totalPrice * 100, // Razorpay uses paisa
+    amount: booking.totalPrice * 100, 
     currency: "INR",
     receipt: booking._id.toString(),
   };
@@ -57,7 +57,6 @@ exports.createPaymentOrder = async (bookingId, userId) => {
     bookingId: booking._id,
   };
 };
-
 
 
 
@@ -94,23 +93,52 @@ exports.verifyPayment = async (data) => {
     throw err;
   }
 
-  if (booking.status === "confirmed") {
-    return booking; 
+  if (booking.bookingState === "CONFIRMED") {
+    return booking;
   }
 
   if (booking.expiresAt < new Date()) {
-    booking.status = "failed";
+    booking.bookingState = "EXPIRED";
     await booking.save();
-
-    const err = new Error("Booking expired before confirmation");
-    err.statusCode = 400;
     throw err;
   }
 
-  booking.status = "confirmed";
+  booking.bookingState = "CONFIRMED";
+  booking.paymentState = "PAID";
   booking.paymentId = razorpay_payment_id;
-
   await booking.save();
 
   return booking;
+};
+
+
+
+exports.refundPayment = async (booking) => {
+
+  const now = new Date();
+  const hoursDiff = (booking.startTime - now) / (1000 * 60 * 60);
+
+  let refundPercentage = 0;
+
+  if (hoursDiff > 24) refundPercentage = 1;
+  else if (hoursDiff > 2) refundPercentage = 0.5;
+  else refundPercentage = 0;
+
+  if (refundPercentage === 0) return null;
+
+  const refundAmount = booking.totalPrice * refundPercentage;
+
+  const refund = await razorpay.payments.refund(
+    booking.paymentId,
+    {
+      amount: Math.round(refundAmount * 100) // always integer paisa
+    }
+  );
+
+  booking.refundId = refund.id;
+  booking.refundAmount = refundAmount;
+
+  await booking.save();
+
+  return refund;
 };

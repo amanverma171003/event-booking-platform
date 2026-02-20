@@ -11,7 +11,8 @@ const {
   getVenueById,
   updateVenueStatus,
   updateVenue,
-  deleteVenue
+  deleteVenue, 
+  getAvailability
 } = require("../controllers/venue.controller");
 
 const { createVenueSchema, updateStatusSchema, updateVenueSchema } = require("../validations/venue.validation");
@@ -52,5 +53,9 @@ router.delete(
   deleteVenue
 );
 
+router.get(
+  "/:venueId/availability",
+  getAvailability
+);
 
 module.exports = router;

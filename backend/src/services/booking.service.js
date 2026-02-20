@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
 const Venue = require("../models/Venue");
+const paymentService = require("./payment.service");
 
 exports.createBooking = async (data, user) => {
   const { venueId, startTime, endTime } = data;
@@ -26,16 +27,19 @@ exports.createBooking = async (data, user) => {
     // Overlap check
     const overlappingBooking = await Booking.findOne({
       venue: venueId,
-      status: { $in: ["pending", "confirmed"] },
-      $or: [
-            { status: "confirmed" },
+      $and: [
+        {
+          $or: [
+            { bookingState: "CONFIRMED" },
             {
-            status: "pending",
-            expiresAt: { $gt: new Date() }
+              bookingState: "PENDING_PAYMENT",
+              expiresAt: { $gt: new Date() }
             }
-      ],
-      startTime: { $lt: endTime },
-      endTime: { $gt: startTime },
+          ]
+        },
+        { startTime: { $lt: endTime } },
+        { endTime: { $gt: startTime } }
+      ]
     }).session(session);
 
     if (overlappingBooking) {
@@ -51,19 +55,18 @@ exports.createBooking = async (data, user) => {
     const totalPrice = durationHours * venue.pricePerHour;
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-    
+
     const booking = await Booking.create(
-      [
-        {
-          venue: venueId,
-          user: user.id,
-          startTime,
-          endTime,
-          totalPrice,
-          status: "pending",
-          expiresAt
-        },
-      ],
+      [{
+        venue: venueId,
+        user: user.id,
+        startTime,
+        endTime,
+        totalPrice,
+        bookingState: "PENDING_PAYMENT",
+        paymentState: "UNPAID",
+        expiresAt
+      }],
       { session }
     );
 
@@ -106,7 +109,7 @@ exports.cancelBooking = async (bookingId, user) => {
     throw err;
   }
 
-  // Only owner or admin can cancel
+  // Authorization
   if (
     booking.user.toString() !== user.id &&
     user.role !== "admin"
@@ -116,31 +119,43 @@ exports.cancelBooking = async (bookingId, user) => {
     throw err;
   }
 
-  // Only pending or confirmed can be cancelled
-  if (!["pending", "confirmed"].includes(booking.status)) {
+  //  Only certain booking states allowed
+  if (!["PENDING_PAYMENT", "CONFIRMED"].includes(booking.bookingState)) {
     const err = new Error("Booking cannot be cancelled");
     err.statusCode = 400;
     throw err;
   }
 
-  // Optional: Prevent cancelling after start time
-  if (booking.startTime < new Date()) {
+  // Cannot cancel after booking start
+  const now = new Date();
+  if (now >= booking.startTime) {
     const err = new Error("Cannot cancel after booking has started");
     err.statusCode = 400;
     throw err;
   }
 
-  const now = new Date();
+  // Refund logic if payment was completed
+  if (booking.paymentState === "PAID") {
 
-    if (now >= booking.startTime) {
-        const err = new Error("Cannot cancel after booking has started");
-        err.statusCode = 400;
-        throw err;
+    const refund = await paymentService.refundPayment(booking);
+
+    if (refund) {
+
+      const expectedFullRefund = booking.totalPrice * 100;
+
+      booking.paymentState =
+        refund.amount >= expectedFullRefund
+          ? "REFUNDED"
+          : "PARTIALLY_REFUNDED";
+
+    } else {
+      // No refund applied
+      booking.paymentState = "PAID"; 
     }
+  }
 
-
-  booking.status = "cancelled";
-  await booking.save();
+booking.bookingState = "CANCELLED";
+await booking.save();
 
   return booking;
 };
