@@ -5,6 +5,7 @@ const bookingRoutes = require("./routes/booking.routes");
 const paymentRoutes = require("./routes/payment.routes");
 const { errorHandler } = require("./middleware/error.middleware");
 const reviewRoutes = require("./routes/review.routes");
+const analyticsRoutes = require("./routes/analytics.routes");
 
 const cors = require("cors");
 
@@ -27,6 +28,9 @@ app.use("/api/payments", paymentRoutes);
 
 // review routes
 app.use("/api/reviews", reviewRoutes);
+
+// analytics routes
+app.use("/api/admin/analytics", analyticsRoutes);
 
 // landing page route
 app.get("/", (req, res) => {

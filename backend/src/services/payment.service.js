@@ -59,7 +59,6 @@ exports.createPaymentOrder = async (bookingId, userId) => {
 };
 
 
-
 exports.verifyPayment = async (data) => {
 
   const {
@@ -69,23 +68,30 @@ exports.verifyPayment = async (data) => {
     bookingId
   } = data;
 
-  const body = razorpay_order_id + "|" + razorpay_payment_id;
-
-  const expectedSignature = crypto
-    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-    .update(body.toString())
-    .digest("hex");
-
-  if (expectedSignature !== razorpay_signature) {
-    const err = new Error("Payment verification failed");
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    const err = new Error("Missing payment verification fields");
     err.statusCode = 400;
     throw err;
   }
 
+  //  Signature Verification
+  const body = razorpay_order_id + "|" + razorpay_payment_id;
+
+  const expectedSignature = crypto
+    .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+    .update(body)
+    .digest("hex");
+
+  if (expectedSignature !== razorpay_signature) {
+    const err = new Error("Invalid payment signature");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Find booking strictly by razorpayOrderId
   const booking = await Booking.findOne({
     razorpayOrderId: razorpay_order_id
   });
-
 
   if (!booking) {
     const err = new Error("Booking not found");
@@ -93,30 +99,63 @@ exports.verifyPayment = async (data) => {
     throw err;
   }
 
-  if (booking.bookingState === "CONFIRMED") {
-    return booking;
-  }
-
-  if (booking.expiresAt < new Date()) {
-    booking.bookingState = "EXPIRED";
-    await booking.save();
+  // Ensure bookingId matches (anti-tampering protection)
+  if (bookingId && booking._id.toString() !== bookingId) {
+    const err = new Error("Booking mismatch");
+    err.statusCode = 400;
     throw err;
   }
 
+  //  Prevent verifying expired bookings
+  if (booking.expiresAt < new Date()) {
+    booking.bookingState = "EXPIRED";
+    booking.paymentState = "FAILED";
+    await booking.save();
+
+    const err = new Error("Booking expired");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Prevent verifying already confirmed
+  if (booking.paymentState === "PAID") {
+    const err = new Error("Payment already verified");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (booking.bookingState !== "PENDING_PAYMENT") {
+    const err = new Error("Booking not eligible for payment");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  // Mark confirmed
   booking.bookingState = "CONFIRMED";
   booking.paymentState = "PAID";
   booking.paymentId = razorpay_payment_id;
+
   await booking.save();
 
   return booking;
 };
 
 
-
 exports.refundPayment = async (booking) => {
 
   const now = new Date();
   const hoursDiff = (booking.startTime - now) / (1000 * 60 * 60);
+
+  if (booking.paymentState === "REFUNDED" ||
+    booking.paymentState === "PARTIALLY_REFUNDED") {
+    const err = new Error("Already refunded");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (!booking.paymentId) {
+    throw new Error("No payment to refund");
+  }
 
   let refundPercentage = 0;
 
