@@ -2,6 +2,13 @@ const Venue = require("../models/Venue");
 const mongoose = require("mongoose");
 
 exports.createVenue = async (data, user) => {
+
+  const vendor = await VendorProfile.findOne({ user: req.user.id });
+
+  if (!vendor || vendor.kycStatus !== "VERIFIED") {
+    throw new Error("Vendor not verified");
+  }
+
   const venue = await Venue.create({
     name: data.name,
     description: data.description,

@@ -33,6 +33,16 @@ const bookingSchema = new mongoose.Schema(
       required: true,
     },
 
+    platformFee: {
+      type: Number,
+      default: 0
+    },
+
+    vendorEarning: {
+      type: Number,
+      default: 0
+    },
+
     // Booking Lifecycle State
     bookingState: {
       type: String,
@@ -97,5 +107,8 @@ bookingSchema.index({ venue: 1, startTime: 1, endTime: 1 });
 
 // Fast state filtering
 bookingSchema.index({ bookingState: 1, paymentState: 1 });
+
+// Vendor analytics optimization
+bookingSchema.index({ venue: 1, bookingState: 1, paymentState: 1 });
 
 module.exports = mongoose.model("Booking", bookingSchema);

@@ -1,4 +1,6 @@
 const paymentService = require("../services/payment.service");
+const crypto = require("crypto");
+const Booking = require("../models/Booking");
 
 exports.createOrder = async (req, res, next) => {
   try {
@@ -31,8 +33,7 @@ exports.verifyPayment = async (req, res, next) => {
 };
 
 exports.handleWebhook = async (req, res) => {
-  const crypto = require("crypto");
-
+  
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
 
   const signature = req.headers["x-razorpay-signature"];
@@ -54,9 +55,12 @@ exports.handleWebhook = async (req, res) => {
 
     const booking = await Booking.findOne({ razorpayOrderId: orderId });
 
-    if (booking && booking.status !== "confirmed") {
-      booking.status = "confirmed";
+    if (booking && booking.bookingState !== "CONFIRMED") {
+
+      booking.bookingState = "CONFIRMED";
+      booking.paymentState = "PAID";
       booking.paymentId = event.payload.payment.entity.id;
+
       await booking.save();
     }
   }

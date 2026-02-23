@@ -26,6 +26,13 @@ exports.protect = async (req, res, next) => {
       return res.status(401).json({ message: "User not found" });
     }
 
+    if (user.status === "SUSPENDED") {
+      return res.status(403).json({
+        success: false,
+        message: "Account suspended"
+      });
+    }
+
     req.user = {
       id: decoded.id,
       role: decoded.role,

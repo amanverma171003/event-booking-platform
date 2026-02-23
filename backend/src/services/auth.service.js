@@ -257,6 +257,12 @@ exports.loginWithEmail = async (email, password) => {
     throw err;
   }
 
+  if (user.status === "SUSPENDED") {
+    const err = new Error("Account suspended. Contact support.");
+    err.statusCode = 403;
+    throw err;
+  }
+
   const isMatch = await bcrypt.compare(password, user.password);
 
   if (!isMatch) {

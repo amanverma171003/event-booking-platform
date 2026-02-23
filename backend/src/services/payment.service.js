@@ -2,6 +2,8 @@ const Razorpay = require("razorpay");
 const Booking = require("../models/Booking");
 const mongoose = require("mongoose");
 const crypto = require("crypto");
+const VendorProfile = require("../models/VendorProfile");
+const Venue = require('../models/Venue');
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
@@ -130,7 +132,41 @@ exports.verifyPayment = async (data) => {
     throw err;
   }
 
-  // Mark confirmed
+  
+  // Fetch venue
+  const venue = await Venue.findById(booking.venue);
+
+  if (!venue) {
+    const err = new Error("Venue not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Fetch vendor profile
+  const vendorProfile = await VendorProfile.findOne({ user: venue.owner });
+
+  if (!vendorProfile) {
+    const err = new Error("Vendor profile not found");
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Ensure vendor KYC is verified
+  if (vendorProfile.kycStatus !== "VERIFIED") {
+    const err = new Error("Vendor not KYC verified");
+    err.statusCode = 403;
+    throw err;
+  }
+
+  // Commission calculation
+  const commissionRate = vendorProfile.commissionRate ?? 10;
+
+  const platformFee = (booking.totalPrice * commissionRate) / 100;
+  const vendorEarning = booking.totalPrice - platformFee;
+
+  booking.platformFee = platformFee;
+  booking.vendorEarning = vendorEarning;
+
   booking.bookingState = "CONFIRMED";
   booking.paymentState = "PAID";
   booking.paymentId = razorpay_payment_id;
